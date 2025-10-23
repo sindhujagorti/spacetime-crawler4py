@@ -1,21 +1,62 @@
 import re
-from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, urljoin, urldefrag, urlparse, urlunparse
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
 def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+    links = []
+
+    # Validate the response
+    if not resp or resp.status != 200:
+        return links
+
+    raw = getattr(resp, "raw_response", None)
+    if raw is None or not hasattr(raw, "content"):
+        return links
+    content = raw.content
+    if not content:
+        return links
+
+    # Verify this is HTML (not a binary file)
+    try:
+        ctype = raw.headers.get("Content-Type", "") or ""
+    except Exception:
+        ctype = ""
+    if "html" not in ctype.lower():
+        # simple binary sniff fallback
+        if b"<" not in content[:1000]:
+            return links
+
+    base_url = getattr(raw, "url", None) or getattr(resp, "url", None) or url
+
+    try:
+        soup = BeautifulSoup(content, "lxml")
+    except Exception:
+        soup = BeautifulSoup(content, "html.parser")
+
+    candidates = []
+    for tag in soup.find_all("a", href=True):
+        href = tag.get("href", "").strip()
+        if not href:
+            continue
+        # Skip non-http schemes
+        if href.startswith(("mailto:", "javascript:", "tel:", "data:")):
+            continue
+        abs_url = urljoin(base_url, href)
+        abs_url, _ = urldefrag(abs_url)  # remove fragments
+        candidates.append(abs_url)
+
+    seen = set()
+    for link in candidates:
+        if link not in seen:
+            seen.add(link)
+            links.append(link)
+
+    return links
+
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
