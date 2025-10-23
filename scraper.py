@@ -1,5 +1,6 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urldefrag
+from bs4 import BeautifulSoup 
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -15,7 +16,56 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+    links = []
+
+    if not resp or resp.status != 200:
+        return links
+    
+    raw = getattr(resp, "raw_response", None)
+    if raw is None or not getattr(raw, "content", None):
+        return []
+
+    ctype = ""
+    try:
+        ctype = raw.headers.get("Content-Type", "") or ""
+    except Exception:
+        ctype = ""
+
+    if "html" not in ctype.lower():
+        return []  
+
+    try:
+        soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+    except Exception:
+        return links
+
+    base_url = getattr(resp.raw_response, "url", None) or resp.url or url
+
+    for tag in soup.find_all('a', href=True):
+        href = tag.get('href')
+        if not href:
+            continue
+
+        absolute_url = urljoin(base_url, href)
+        absolute_url, _ = urldefrag(absolute_url)
+
+        if re.search(r'\.(pdf|jpg|jpeg|png|gif|mp4|zip|docx?|pptx?)$', absolute_url.lower()):
+            continue
+
+        domain = urlparse(absolute_url).netloc.lower()
+        if any(domain.endswith(d) for d in [
+            "ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"
+        ]):
+            links.append(absolute_url)
+
+    seen = set()
+    unique_links = []
+    for l in links:
+        if l not in seen:
+            seen.add(l)
+            unique_links.append(l)
+
+    return unique_links
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
