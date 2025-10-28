@@ -1,6 +1,29 @@
 import re
-from urllib.parse import urlparse, urljoin, urldefrag
+from urllib.parse import urlparse, urljoin, urldefrag, parse_qsl
 from bs4 import BeautifulSoup 
+
+_ALLOWED_DOMAINS = ("ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu")
+_REPEAT_SEGMENTS_RE = re.compile(r"/([^/]+/)\1{2,}")
+
+_DATE_PATH_RE = re.compile(r"/(19|20)\d{2}/(0?[1-9]|1[0-2])(/(0?[1-9]|[12]\d|3[01]))?/")
+
+_DISALLOWED_EXT_RE = re.compile(
+    r".*\.(?:css|js|bmp|gif|jpe?g|ico|png|tiff?|mid|mp2|mp3|mp4|wav|avi|mov|mpeg|"
+    r"ram|m4v|mkv|ogg|ogv|pdf|ps|eps|tex|pptx?|docx?|xlsx?|names|data|dat|exe|bz2|"
+    r"tar|msi|bin|7z|psd|dmg|iso|epub|dll|cnf|tgz|sha1|thmx|mso|arff|rtf|jar|csv|"
+    r"rm|smil|wmv|swf|wma|zip|rar|gz)$"
+)
+
+_LOW_VALUE_PATH_HINTS = (
+    "/calendar", "/events", "/event", "/ical", "/wp-json", "/feed", "/tag/", "/author/",
+    "/archive", "/archives", "/category/", "/comment", "/reply", "/login", "/signup"
+)
+
+_TRAP_QUERY_KEYS = ("sort", "order", "page", "offset", "limit", "start", "dir", "sessionid", "phpsessid")
+
+_MAX_URL_LEN = 200            
+_MAX_QUERY_LEN = 150          
+_MAX_QUERY_PARAMS = 8    
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -17,55 +40,53 @@ def extract_next_links(url, resp):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     links = []
-
     if not resp or resp.status != 200:
         return links
-    
-    raw = getattr(resp, "raw_response", None)
-    if raw is None or not getattr(raw, "content", None):
-        return []
 
-    ctype = ""
+    raw = getattr(resp, "raw_response", None)
+    if raw is None:
+        return links
+
     try:
-        ctype = raw.headers.get("Content-Type", "") or ""
+        ctype = (raw.headers.get("Content-Type", "") or "").lower()
     except Exception:
         ctype = ""
 
-    if "html" not in ctype.lower():
-        return []  
+    if "html" not in ctype:
+        return []
+
+    content = getattr(raw, "content", b"")
+    if not content:
+        return []
 
     try:
-        soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+        soup = BeautifulSoup(content, "html.parser")
     except Exception:
-        return links
+        return []
 
-    base_url = getattr(resp.raw_response, "url", None) or resp.url or url
+    base_url = getattr(raw, "url", None) or resp.url or url
 
-    for tag in soup.find_all('a', href=True):
-        href = tag.get('href')
+    for tag in soup.find_all("a", href=True):
+        href = tag.get("href")
         if not href:
             continue
 
         absolute_url = urljoin(base_url, href)
         absolute_url, _ = urldefrag(absolute_url)
 
+        # quick early skip for obvious non-HTML files before is_valid
         if re.search(r'\.(pdf|jpg|jpeg|png|gif|mp4|zip|docx?|pptx?)$', absolute_url.lower()):
             continue
 
-        domain = urlparse(absolute_url).netloc.lower()
-        if any(domain.endswith(d) for d in [
-            "ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"
-        ]):
-            links.append(absolute_url)
+        links.append(absolute_url)
 
-    seen = set()
-    unique_links = []
+    # dedupe preserve order
+    seen, uniq = set(), []
     for l in links:
         if l not in seen:
             seen.add(l)
-            unique_links.append(l)
-
-    return unique_links
+            uniq.append(l)
+    return uniq
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -75,6 +96,41 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        
+        host = parsed.netloc.lower()
+        if not any(host.endswith(d) for d in _ALLOWED_DOMAINS):
+            return False
+
+        # length guards
+        if len(url) > _MAX_URL_LEN:
+            return False
+
+        path_lower = parsed.path.lower()
+
+        # avoid repeating segments (/a/b/a/b/), calendars (/2024/05/12/)
+        if _REPEAT_SEGMENTS_RE.search(path_lower + ("/" if not path_lower.endswith("/") else "")):
+            return False
+        if _DATE_PATH_RE.search(path_lower):
+            return False
+
+        # low-value sections
+        for hint in _LOW_VALUE_PATH_HINTS:
+            if hint in path_lower:
+                return False
+
+        # query explosion guards
+        if parsed.query:
+            if len(parsed.query) > _MAX_QUERY_LEN:
+                return False
+            params = parse_qsl(parsed.query, keep_blank_values=True)
+            if len(params) > _MAX_QUERY_PARAMS:
+                return False
+            for k, v in params:
+                lk = k.lower()
+                if lk in _TRAP_QUERY_KEYS:
+                    if v.isdigit() and int(v) > 100:
+                        return False
+                    
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -88,3 +144,6 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+    except Exception:
+        return False
