@@ -17,6 +17,10 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     return list()
 
+#work on this part
+
+#check for traps (mentioned calander is class)
+# check for patterns? 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
@@ -25,6 +29,28 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        
+        allowed_domains = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
+        domain = parsed.netloc.lower()
+        #if domain does not end with any of allowed_domains dont validate
+        if not any(domain.endswith(allowed) for allowed in allowed_domains):
+            return False
+
+        #extremeyl long URLs usually means infinite loops
+        if len(url) > 200:
+            return False
+        
+        #repeated directory names (ex: /a/b/a/b/a/)
+        path_parts = parsed.path.lower().split("/")
+        if len(path_parts) != len(set(path_parts)):
+            return False
+        
+        #block calendar sequences example: /2024/05/12/. I think greater ot equal
+        #is best since usually year or month is used together or day as well
+        numeric_segments = sum(1 for part in path_parts if part.isdigit())
+        if numeric_segments >= 2:
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
