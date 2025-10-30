@@ -3,6 +3,119 @@ from urllib.parse import urlparse, urljoin, urldefrag, parse_qsl
 from bs4 import BeautifulSoup
 from analytics import CrawlerAnalytics
 
+#  ---------- Duplicate Detection ----------
+
+_exact_text_map = {}        # full_hash -> canonical_url
+_page_shingles = {}         # url -> set(shingle_hashes)
+_shingle_to_urls = {}       # shingle_hash -> set(urls)
+
+
+def _stable_hash(s: str) -> int:
+    """
+    Deterministic 32-bit hash of a string.
+    We don't use Python's built-in hash() because it's salted.
+    DJB2-style rolling hash.
+    """
+    h = 5381
+    for ch in s:
+        h = ((h << 5) + h) + ord(ch)  # h*33 + ord(ch)
+        h &= 0xFFFFFFFF               # keep in 32-bit range
+    return h
+
+
+def _make_shingles(tokens, k=5):
+    """
+    Break the page into overlapping k-word shingles.
+    Example: ["this","is","a","test","page"], k=3
+    -> ["this is a", "is a test", "a test page"]
+    """
+    if len(tokens) < k:
+        return []
+    out = []
+    for i in range(len(tokens) - k + 1):
+        sh = " ".join(tokens[i:i+k])
+        out.append(sh)
+    return out
+
+
+def _jaccard(a: set, b: set) -> float:
+    """
+    Jaccard similarity = |A ∩ B| / |A ∪ B|.
+    """
+    if not a and not b:
+        return 0.0
+    # intersection count fast by looping on smaller set
+    if len(a) < len(b):
+        small, large = a, b
+    else:
+        small, large = b, a
+    inter = 0
+    for x in small:
+        if x in large:
+            inter += 1
+    union = len(a) + len(b) - inter
+    if union == 0:
+        return 0.0
+    return inter / union
+
+
+def check_exact_duplicate(clean_tokens, url):
+    """
+    EXACT duplicate test.
+    - Join cleaned page tokens into a single string
+    - Hash it with _stable_hash
+    - If hash already exists, this page is an exact duplicate of that URL.
+    Returns (is_exact_dupe: bool, original_url: str or None)
+    """
+    joined = " ".join(clean_tokens)
+    h = _stable_hash(joined)
+
+    if h in _exact_text_map:
+        return True, _exact_text_map[h]
+
+    _exact_text_map[h] = url
+    return False, None
+
+
+def register_shingles_and_check_near_duplicate(clean_tokens, url, k=5, threshold=0.8):
+    """
+    NEAR duplicate test using shingles + Jaccard.
+    Steps:
+    1. Generate k-word shingles for this page.
+    2. Hash each shingle with _stable_hash to get a signature set.
+    3. Compare that set against pages that share any of those shingles.
+    4. If Jaccard similarity >= threshold, treat as near-duplicate.
+
+    Returns (is_near_dupe: bool, closest_match_url: str or None, similarity: float)
+    """
+    shingles = _make_shingles(clean_tokens, k=k)
+    sig_set = set(_stable_hash(sh) for sh in shingles)
+
+    _page_shingles[url] = sig_set
+
+    candidates = set()
+    for sig in sig_set:
+        if sig not in _shingle_to_urls:
+            _shingle_to_urls[sig] = set()
+        _shingle_to_urls[sig].add(url)
+
+        for other_url in _shingle_to_urls[sig]:
+            if other_url != url:
+                candidates.add(other_url)
+
+    best_sim = 0.0
+    best_url = None
+    for other_url in candidates:
+        other_sig_set = _page_shingles.get(other_url, set())
+        sim = _jaccard(sig_set, other_sig_set)
+        if sim > best_sim:
+            best_sim = sim
+            best_url = other_url
+
+    if best_sim >= threshold:
+        return True, best_url, best_sim
+    return False, None, best_sim
+
 # ---------- Host scope ----------
 _ALLOWED_DOMAINS = ("ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu")
 
@@ -162,28 +275,44 @@ def extract_next_links(url, resp):
     if len(text_content) < 100:  # Minimum 100 characters
         # This is a dead page with 200 status but no real content
         return []
-
-    # ========== ANALYTICS PROCESSING ==========
-    # Defragment URL for analytics
-    defragged_url, _ = urldefrag(url)
     
-    # Process page for analytics
-    try:
-        analytics.process_page(defragged_url, content)
-        _page_count += 1
-        
-        # Periodic status update
-        if _page_count % 50 == 0:
-            analytics.print_status()
-        
-        # Periodic save (in case of crash)
-        if _page_count % _SAVE_INTERVAL == 0:
-            analytics.save_state()
-            analytics.save_report(filename=f"report_progress_{_page_count}.txt")
-            print(f"Saved analytics state at {_page_count} pages")
-    except Exception as e:
-        print(f"Error processing analytics for {url}: {e}")
+    # ---------- DUPLICATE / NEAR-DUPLICATE CHECKS (+2 pts) ----------
+    # 1. Clean the text into tokens (only alphabetic words, lowercase)
+    tokens = re.findall(r"[A-Za-z]+", text_content)
+    clean_tokens = [t.lower() for t in tokens]
+
+    # 2. EXACT duplicate detection
+    is_exact, exact_src = check_exact_duplicate(clean_tokens, defragged_url)
+
+    # 3. NEAR duplicate detection (shingling + Jaccard)
+    is_near, near_src, near_sim = register_shingles_and_check_near_duplicate(
+        clean_tokens,
+        defragged_url,
+        k=5,
+        threshold=0.8
+    )
+
+    should_count_content = not (is_exact or is_near)
+
+ # ========== ANALYTICS PROCESSING ==========
+    defragged_url, _ = urldefrag(url)
+
+    if should_count_content:
+        try:
+            analytics.process_page(defragged_url, content)
+            _page_count += 1
+
+            if _page_count % 50 == 0:
+                analytics.print_status()
+
+            if _page_count % _SAVE_INTERVAL == 0:
+                analytics.save_state()
+                analytics.save_report(filename=f"report_progress_{_page_count}.txt")
+                print(f"Saved analytics state at {_page_count} pages")
+        except Exception as e:
+            print(f"Error processing analytics for {url}: {e}")
     # ==========================================
+
 
     base_url = getattr(raw, "url", None) or resp.url or url
 
