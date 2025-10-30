@@ -259,6 +259,25 @@ def is_valid(url):
         if '/genealogy/' in path_lower:
             return False
 
+        if '/people/' in path_lower:
+            return False
+
+        # Block cypress subpages (causing 602 errors, but allow main page)
+        if '/~dsm/cypress/' in path_lower:
+            return False
+        
+        # Block sli.ics.uci.edu/Classes (causing 601 errors)
+        if 'sli.ics.uci.edu' in host and '/classes/' in path_lower:
+            return False
+
+        # Block grape.ics.uci.edu wiki pages (causing 601 errors)
+        if 'grape.ics.uci.edu' in host and '/wiki/' in path_lower:
+            return False
+
+        # Block news filter pages (infinite combinations)
+        if '/happening/news/' in path_lower and 'filter[' in parsed.query.lower():
+            return False
+        
         # Block source code repositories and build directories
         if "physics.uci.edu/~outreach/demos" in url.lower():
             return False
