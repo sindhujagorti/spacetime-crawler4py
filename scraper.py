@@ -13,8 +13,6 @@ _shingle_to_urls = {}       # shingle_hash -> set(urls)
 def _stable_hash(s: str) -> int:
     """
     Deterministic 32-bit hash of a string.
-    We don't use Python's built-in hash() because it's salted.
-    DJB2-style rolling hash.
     """
     h = 5381
     for ch in s:
@@ -62,9 +60,6 @@ def _jaccard(a: set, b: set) -> float:
 def check_exact_duplicate(clean_tokens, url):
     """
     EXACT duplicate test.
-    - Join cleaned page tokens into a single string
-    - Hash it with _stable_hash
-    - If hash already exists, this page is an exact duplicate of that URL.
     Returns (is_exact_dupe: bool, original_url: str or None)
     """
     joined = " ".join(clean_tokens)
@@ -80,12 +75,6 @@ def check_exact_duplicate(clean_tokens, url):
 def register_shingles_and_check_near_duplicate(clean_tokens, url, k=5, threshold=0.8):
     """
     NEAR duplicate test using shingles + Jaccard.
-    Steps:
-    1. Generate k-word shingles for this page.
-    2. Hash each shingle with _stable_hash to get a signature set.
-    3. Compare that set against pages that share any of those shingles.
-    4. If Jaccard similarity >= threshold, treat as near-duplicate.
-
     Returns (is_near_dupe: bool, closest_match_url: str or None, similarity: float)
     """
     shingles = _make_shingles(clean_tokens, k=k)
@@ -275,7 +264,10 @@ def extract_next_links(url, resp):
     if len(text_content) < 100:  # Minimum 100 characters
         # This is a dead page with 200 status but no real content
         return []
-    
+
+    # defragment URL for analytics / duplicate logic
+    defragged_url, _ = urldefrag(url)
+
     # ---------- DUPLICATE / NEAR-DUPLICATE CHECKS (+2 pts) ----------
     # 1. Clean the text into tokens (only alphabetic words, lowercase)
     tokens = re.findall(r"[A-Za-z]+", text_content)
@@ -295,8 +287,6 @@ def extract_next_links(url, resp):
     should_count_content = not (is_exact or is_near)
 
  # ========== ANALYTICS PROCESSING ==========
-    defragged_url, _ = urldefrag(url)
-
     if should_count_content:
         try:
             analytics.process_page(defragged_url, content)
@@ -312,7 +302,6 @@ def extract_next_links(url, resp):
         except Exception as e:
             print(f"Error processing analytics for {url}: {e}")
     # ==========================================
-
 
     base_url = getattr(raw, "url", None) or resp.url or url
 
