@@ -6,6 +6,15 @@ from analytics import CrawlerAnalytics
 # ---------- Host scope ----------
 _ALLOWED_DOMAINS = ("ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu")
 
+def _in_scope_host(host: str) -> bool:
+    host = (host or "").lower().strip(".")
+    for d in _ALLOWED_DOMAINS:
+        d = d.lower()
+        if host == d or host.endswith("." + d):
+            return True
+    return False
+
+
 # Initialize analytics (global instance)
 analytics = CrawlerAnalytics(stop_words_file="stop_words.txt")
 
@@ -202,6 +211,9 @@ def extract_next_links(url, resp):
             absolute_url = urljoin(base_url, href)
             absolute_url, _ = urldefrag(absolute_url)
             absolute_url = _normalize_url(absolute_url)
+            abs_host = urlparse(absolute_url).netloc.lower()
+            if not _in_scope_host(abs_host):
+                continue
         except (ValueError, Exception):
             # Skip URLs that can't be parsed (malformed, placeholders, etc.)
             continue
@@ -227,7 +239,6 @@ def extract_next_links(url, resp):
             seen.add(l)
             uniq.append(l)
     return uniq
-
 def is_valid(url):
     try:
         parsed = urlparse(url)
@@ -235,7 +246,7 @@ def is_valid(url):
             return False
 
         host = parsed.netloc.lower()
-        if not any(host.endswith(d) for d in _ALLOWED_DOMAINS):
+        if not _in_scope_host(host):
             return False
 
         # length guards
@@ -244,19 +255,28 @@ def is_valid(url):
 
         path_lower = parsed.path.lower()
 
+        # Block genealogy pages (causing 602 errors)
+        if '/genealogy/' in path_lower:
+            return False
+
         # Block source code repositories and build directories
         if "physics.uci.edu/~outreach/demos" in url.lower():
             return False
         
-        if any(x in path_lower for x in ['/src/', '/build/', '/docs/', '/releases/', '/lib/', '/bin/']):
-            return False
-        
-        # Instructor/course dump roots (mostly binaries; triggers throttling)
-        if re.match(r"^/~[^/]+/(courses?|class|teaching)(/|$)", path_lower):
+        # Only block if /src/ or /build/ appear (code repos)
+        # But allow /docs/ for documentation sites
+        if any(x in path_lower for x in ['/src/', '/build/', '/lib/', '/bin/']):
             return False
 
-        # Common course-code roots under personal dirs: /~user/ics123, /~user/cs143, etc.
-        if re.match(r"^/~[^/]+/(ics|cs|inf|net|netsys)\d", path_lower):
+        # Block /releases/ only if it looks like software releases
+        if '/releases/' in path_lower and any(x in path_lower for x in ['/src/', '/build/', 'download']):
+            return False
+                
+        # Only block deep course material paths that cause issues
+        # Allow top-level course pages
+        if re.match(r"^/~[^/]+/(ics|cs|inf)\d+/.+/.+/", path_lower):
+            # Blocks /~prof/ics32/lectures/week1/code/examples/ (deep nesting)
+            # Allows /~prof/ics32/ and /~prof/ics32/syllabus (top level)
             return False
 
         # Block makefile and README files
@@ -268,7 +288,7 @@ def is_valid(url):
                                           '/img/', '/pics/', '/picture/']):
             return False
         
-        #Video trap
+        # Video trap
         if path_lower.startswith("/~projects/cert/safire/meetings/"):
             return False
     

@@ -3,6 +3,7 @@ import re
 from collections import defaultdict, Counter
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
+import os, time
 
 class CrawlerAnalytics:
     def __init__(self, stop_words_file="stop_words.txt"):
@@ -13,6 +14,11 @@ class CrawlerAnalytics:
         self.subdomain_pages = defaultdict(set)  
         
         self.stop_words = self._load_stop_words(stop_words_file)
+
+        self.state_path = os.environ.get("ANALYTICS_STATE_PATH") or \
+                          os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "analytics_state.json")
+        self.report_dir = os.getcwd() 
     
     def _load_stop_words(self, filename):
         """Load stop words from file"""
