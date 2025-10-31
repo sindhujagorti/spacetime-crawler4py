@@ -262,21 +262,44 @@ def is_valid(url):
         if '/people/' in path_lower:
             return False
 
+        # Block specific subdomain subpages (allow main page only)
+        if 'checkmate.ics.uci.edu' in host and path_lower not in ('', '/'):
+            return False
+        if 'kgcs.ics.uci.edu' in host and path_lower not in ('', '/'):
+            return False
+        if 'mt-live.ics.uci.edu' in host and path_lower not in ('', '/'):
+            return False
+
+        # Block transformativeplay subpages (allow main page)
+        if 'transformativeplay.ics.uci.edu' in host and path_lower not in ('', '/'):
+            return False
+        
+        if 'graphics.ics.uci.edu' in host and '/publications/' in path_lower:
+            return False
+
+        if 'grape.ics.uci.edu' in host and '/wiki/public/wiki/' in path_lower:
+            return False
+        
+        
+        # Block fano.ics.uci.edu entirely (all CA rules return 601)
+        if 'fano.ics.uci.edu' in host:
+            return False
+        # Block sli.ics.uci.edu extras and classes (causing 601 errors)
+        if 'sli.ics.uci.edu' in host and ('/extras/' in path_lower or '/classes/' in path_lower):
+            return False
+
+        # Block ~jutts course materials (causing 602 errors)
+        if '/~jutts/' in path_lower:
+            return False
+
+        # Block ~dechter courses (causing 602 errors)  
+        if '/~dechter/courses/' in path_lower:
+            return False
+
         # Block cypress subpages (causing 602 errors, but allow main page)
         if '/~dsm/cypress/' in path_lower:
             return False
-        
-        # Block sli.ics.uci.edu/Classes (causing 601 errors)
-        if 'sli.ics.uci.edu' in host and '/classes/' in path_lower:
-            return False
 
-        # Block grape.ics.uci.edu wiki pages (causing 601 errors)
-        if 'grape.ics.uci.edu' in host and '/wiki/' in path_lower:
-            return False
-
-        # Block news filter pages (infinite combinations)
-        if '/happening/news/' in path_lower and 'filter[' in parsed.query.lower():
-            return False
         
         # Block source code repositories and build directories
         if "physics.uci.edu/~outreach/demos" in url.lower():
