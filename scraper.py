@@ -279,7 +279,14 @@ def is_valid(url):
 
         if 'grape.ics.uci.edu' in host and '/wiki/public/wiki/' in path_lower:
             return False
-        
+
+        # Block news filter pages (infinite combinations causing 608 errors)
+        if '/happening/news/' in path_lower and ('filter[' in parsed.query.lower() or 'filter%5B' in parsed.query.lower()):
+            return False
+
+        # Block ~goodrich/teach lab manuals (causing 602 errors)
+        if '/~goodrich/teach/' in path_lower and '/labmanual/' in path_lower:
+            return False
         
         # Block fano.ics.uci.edu entirely (all CA rules return 601)
         if 'fano.ics.uci.edu' in host:
