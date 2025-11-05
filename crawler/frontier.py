@@ -13,9 +13,14 @@ class Frontier(object):
         self.logger = get_logger("FRONTIER")
         self.config = config
         self.to_be_downloaded = list()
-        
+
+        # Added separate locks for multi-threading:
+        #  - self.lock protects shared queue + shelve
+        #  - self.domain_lock protects per-domain timestamp map
+        # This prevents races where multiple workers fetch or save at the same time.
         self.lock = RLock()
         self.domain_lock = RLock()
+        # Added per-domain last-access tracker for polite crawling timing
         self.domain_last_accessed = defaultdict(float)
         
         if not os.path.exists(self.config.save_file) and not restart:
@@ -26,7 +31,9 @@ class Frontier(object):
             self.logger.info(
                 f"Found save file {self.config.save_file}, deleting it.")
             os.remove(self.config.save_file)
-        
+
+        # Switched shelve to writeback=True to safely update (url, status)
+        # across threads without needing manual .sync() each time
         self.save = shelve.open(self.config.save_file, writeback=True)
         
         if restart:
@@ -56,8 +63,14 @@ class Frontier(object):
         except:
             return None
 
-    def get_tbd_url(self):
-        """ATOMIC: Check and mark domain in single lock acquisition"""
+    # Replaced simple pop() with domain-aware fetch
+    # Ensures only one thread hits a domain at a time (politeness delay)
+    # Performs atomic "check + pop + timestamp update" under locks
+    def get_tbd_url(self):\
+        # Enter global lock so only one thread mutates queue at a time
+        # Atomically pop URL + stamp domain access time
+        # prevents two threads from taking URLs for same domain simultaneously
+
         with self.lock:
             if not self.to_be_downloaded:
                 return None
@@ -71,7 +84,7 @@ class Frontier(object):
                 if not domain:
                     continue
                 
-                # CRITICAL: Check AND mark in SAME lock
+                # Check AND mark in SAME lock
                 with self.domain_lock:
                     last_access = self.domain_last_accessed.get(domain, 0.0)
                     time_since = now - last_access
@@ -83,12 +96,15 @@ class Frontier(object):
                         return url
             
             return None
-
+        
+    # Protected add operation with lock to avoid duplicate inserts
+    # and race conditions while multiple threads add URLs
     def add_url(self, url):
         url = normalize(url)
         urlhash = get_urlhash(url)
         
         with self.lock:
+        # Removed .sync() because writeback=True handles persistence safely
             try:
                 if urlhash not in self.save:
                     self.save[urlhash] = (url, False)
@@ -105,6 +121,8 @@ class Frontier(object):
             except Exception as e:
                 self.logger.error(f"Error marking URL complete {url}: {e}")
 
+    # Added helper for workers to sleep until next domain ready
+    # prevents tight loops + improves efficiency in multi-thread crawl
     def next_ready_wait(self):
         with self.domain_lock:
             now = time.monotonic()

@@ -1,0 +1,158 @@
+================================================================================
+WEB CRAWLER ANALYTICS REPORT
+================================================================================
+
+1. Number of unique pages: 9400
+
+2. Longest page (by word count):
+   URL: https://www.stat.uci.edu/covid19/index.html
+   Word count: 28711
+
+3. Top 50 most common words:
+   1. 2021: 30132
+   2. markellekelly: 26855
+   3. can: 26243
+   4. 2022: 25195
+   5. will: 23650
+   6. research: 23531
+   7. software: 21762
+   8. ics: 20952
+   9. one: 19094
+   10. 2020: 19046
+   11. may: 18352
+   12. student: 16835
+   13. 10: 16700
+   14. computer: 16534
+   15. data: 16463
+   16. html: 16439
+   17. information: 16378
+   18. uci: 16332
+   19. 2023: 15675
+   20. time: 14760
+   21. 2018: 14046
+   22. engineering: 13099
+   23. update: 12858
+   24. course: 12590
+   25. 2019: 12519
+   26. students: 12096
+   27. 2017: 11977
+   28. design: 11773
+   29. 2016: 11716
+   30. automatic: 11522
+   31. informatics: 11389
+   32. 11: 11305
+   33. 2015: 11263
+   34. use: 11193
+   35. graduate: 11182
+   36. undergraduate: 11081
+   37. also: 11060
+   38. work: 10998
+   39. science: 10944
+   40. program: 10765
+   41. 12: 10639
+   42. university: 10591
+   43. new: 10263
+   44. project: 9970
+   45. code: 9887
+   46. systems: 9744
+   47. june: 9691
+   48. irvine: 9486
+   49. september: 9327
+   50. set: 9271
+
+4. Subdomains in uci.edu domain:
+   Total subdomains found: 93
+
+   accessibility.ics.uci.edu, 6
+   acoi.ics.uci.edu, 76
+   alderis.ics.uci.edu, 7
+   archive-beta.ics.uci.edu, 9
+   archive.ics.uci.edu, 31
+   asterix.ics.uci.edu, 14
+   bayes-bats.ics.uci.edu, 7
+   capstone.cs.uci.edu, 8
+   cert.ics.uci.edu, 29
+   checkin.ics.uci.edu, 1
+   chenli.ics.uci.edu, 11
+   cloudberry.ics.uci.edu, 19
+   cml.ics.uci.edu, 14
+   code.ics.uci.edu, 14
+   computableplant.ics.uci.edu, 71
+   courselisting.ics.uci.edu, 5
+   cradl.ics.uci.edu, 5
+   create.ics.uci.edu, 3
+   cs.ics.uci.edu, 13
+   cs.uci.edu, 1
+   cwicsocal18.ics.uci.edu, 11
+   cyberclub.ics.uci.edu, 1
+   dgillen.ics.uci.edu, 9
+   ds4all.ics.uci.edu, 5
+   duttgroup.ics.uci.edu, 42
+   dynamo.ics.uci.edu, 9
+   edgelab.ics.uci.edu, 6
+   elms.ics.uci.edu, 1
+   emj.ics.uci.edu, 31
+   evoke.ics.uci.edu, 2
+   flamingo.ics.uci.edu, 91
+   fr.ics.uci.edu, 3
+   futurehealth.ics.uci.edu, 4
+   grape.ics.uci.edu, 10
+   graphics.ics.uci.edu, 7
+   graphmod.ics.uci.edu, 1
+   hai.ics.uci.edu, 6
+   hobbes.ics.uci.edu, 10
+   hpi.ics.uci.edu, 5
+   i-sensorium.ics.uci.edu, 5
+   icde2023.ics.uci.edu, 46
+   ics.uci.edu, 5050
+   industryshowcase.ics.uci.edu, 23
+   informatics.ics.uci.edu, 2
+   informatics.uci.edu, 2
+   insite.ics.uci.edu, 9
+   intranet.ics.uci.edu, 1
+   ipubmed.ics.uci.edu, 1
+   isg.ics.uci.edu, 130
+   isi-buds.ics.uci.edu, 4
+   jgarcia.ics.uci.edu, 4
+   luci.ics.uci.edu, 3
+   mailman.ics.uci.edu, 35
+   malek.ics.uci.edu, 1
+   mcs.ics.uci.edu, 12
+   mdogucu.ics.uci.edu, 1
+   mds.ics.uci.edu, 7
+   mhcid.ics.uci.edu, 21
+   mswe.ics.uci.edu, 11
+   nalini.ics.uci.edu, 7
+   ngs.ics.uci.edu, 104
+   oai.ics.uci.edu, 5
+   plrg.ics.uci.edu, 16
+   psearch.ics.uci.edu, 1
+   redmiles.ics.uci.edu, 1
+   riscit.ics.uci.edu, 1
+   scale.ics.uci.edu, 5
+   seal.ics.uci.edu, 44
+   sherlock.ics.uci.edu, 7
+   stairs.ics.uci.edu, 4
+   stat.ics.uci.edu, 11
+   stat.uci.edu, 2
+   statconsulting.ics.uci.edu, 4
+   student-council.ics.uci.edu, 1
+   studentcouncil.ics.uci.edu, 1
+   students.ics.uci.edu, 1
+   summeracademy.ics.uci.edu, 6
+   support.ics.uci.edu, 2
+   tad.ics.uci.edu, 2
+   tastier.ics.uci.edu, 1
+   tutoring.ics.uci.edu, 5
+   ugradforms.ics.uci.edu, 1
+   unite.ics.uci.edu, 10
+   vision.ics.uci.edu, 177
+   wics.ics.uci.edu, 459
+   wiki.ics.uci.edu, 1
+   www-db.ics.uci.edu, 22
+   www.cs.uci.edu, 7
+   www.ics.uci.edu, 1309
+   www.informatics.ics.uci.edu, 1
+   www.informatics.uci.edu, 963
+   www.stat.uci.edu, 247
+   xtune.ics.uci.edu, 6

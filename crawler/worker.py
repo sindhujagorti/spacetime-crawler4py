@@ -1,6 +1,5 @@
 from threading import Thread
 from inspect import getsource
-from urllib.parse import urlparse       # <-- add this
 from utils.download import download
 from utils import get_logger
 import scraper
@@ -11,6 +10,7 @@ class Worker(Thread):
         self.logger = get_logger(f"Worker-{worker_id}", "Worker")
         self.config = config
         self.frontier = frontier
+        #worker_id on the instance (useful for per-thread logs/metrics).
         self.worker_id = worker_id
 
         # basic check for requests in scraper
@@ -22,7 +22,8 @@ class Worker(Thread):
     def run(self):
         while True:
             tbd_url = self.frontier.get_tbd_url()
-
+            # hanged: don't exit when no URL is immediately available.
+            # back off based on next_ready_wait() (domain politeness) with a bounded sleep.
             if not tbd_url:
                 wait = self.frontier.next_ready_wait()
                 time.sleep(min(max(wait, 0.05), 1.0))
@@ -43,3 +44,6 @@ class Worker(Thread):
 
             # Mark complete
             self.frontier.mark_url_complete(tbd_url)
+
+# Removed: time.sleep(self.config.time_delay)
+# Frontier now enforces per-domain politeness; workers don't add a global delay.
